@@ -1,0 +1,206 @@
+---
+title: "Baseball Github"
+author: "Zelos Zhu"
+date: "April 6, 2016"
+output: html_document
+---
+
+```{r}
+#load in the data
+library(readr)
+library(dplyr)
+#create dataframes of the teams
+teams<-read_csv("Teams.csv",col_names=TRUE,na="",col_type="i-------iicc--iiiiiiiiiiiiiiniiiiiiiiiinc-------")
+modernteams<-filter(teams,yearID>=1998)
+playoffteams<-filter(modernteams,DivWin=="Y"| WCWin=="Y")
+bustedteams<-filter(modernteams,DivWin=="N"& WCWin=="N")
+divisionwinners<-filter(playoffteams,DivWin=="Y")
+wildcardwinners<-filter(playoffteams,WCWin=="Y")
+```
+
+Playoff teams are the ones that win the most, begin with determining roughly how many wins a team needs to achieve postseason berth.
+Summary of Wins
+```{r}
+#average&median wins for playoff teams in general
+avgwins_general<-mean(playoffteams$W)
+medwins_general<-median(playoffteams$W)
+sdwins_general<-sd(playoffteams$W)
+
+#average&median wins for division winners
+avgwins_divwin<- mean(divisionwinners$W)
+medwins_divwin<-median(divisionwinners$W)
+sdwins_div<-sd(divisionwinners$W)
+
+#average&median wins for wildcard winners
+avgwins_wcwin<-mean(wildcardwinners$W)
+medwins_wcwin<-median(wildcardwinners$W)
+sdwins_wc<-sd(wildcardwinners$W)
+
+#dataframe of 
+winID<-c("general","divsion","wildcard")
+mean_wins<-c(avgwins_general,avgwins_divwin,avgwins_wcwin)
+median_wins<-c(medwins_general,medwins_divwin,medwins_wcwin)
+sd_wins<-c(sdwins_general,sdwins_div,sdwins_wc)
+Win_Table<-data.frame(winID,mean_wins,median_wins,sd_wins)
+print(Win_Table)
+
+
+#create a factor to separate playoff types
+playoffs<-rep("N",510)
+divwin<-which(modernteams$DivWin=="Y")
+wcwin<-which(modernteams$WCWin=="Y")
+playoffs[divwin]<-"D"
+playoffs[wcwin]<-"W"
+modernteams$playoffs<-playoffs
+modernteams$playoffs<-factor(modernteams$playoffs,levels=c("N","D","W"),labels=c("No Playoffs","Division Winner","Wild Card"))
+
+t.test(playoffteams$W,bustedteams$W,alternative = "greater")
+t.test(divisionwinners$W,wildcardwinners$W,alternative="two.sided")
+
+modernteams$color[modernteams$playoffs=="No Playoffs"] <- "red"
+modernteams$color[modernteams$playoffs=="Division Winner"] <- "blue"
+modernteams$color[modernteams$playoffs=="Wild Card"] <- "green"
+dotchart(modernteams$W,cex=.7,groups= modernteams$playoffs,
+  	main="Eligibility for Playoffs in Wins",
+   xlab="wins", gcolor="black", color=modernteams$color)
+```
+
+The average amount of wins for playoff teams in general is `r Win_Table[1,2]`, for division winners is `r Win_Table[2,2]` and for wild card winners tends to be `r Win_Table[3,2]`. However, just visually observing the graph, it is evvidently clear that there is a rough minimum amount of wins needed to enter playoffs, 88 wins. No wild card team since 1998 has made it to the playoffs without at least 88 wins. It is also clear there are a handful of teams that have eclipsed this 88 win mark and not made playoffs and a handful of teams that had less and got into playoffs. But in general, there is a clear line between playoffs and not. Our next exploration will lie in batting and pitching stats.Moving forward, I also think it is important to continue comparing statistics even further between division winners and wild card teams.
+
+Run Differential
+```{r}
+#The question of run differential
+modernteams<-mutate(modernteams,rundiff=R-RA)
+playoffteams<-mutate(playoffteams,rundiff=R-RA)
+bustedteams<-mutate(bustedteams, rundiff=R-RA)
+divisionwinners<-mutate(divisionwinners,rundiff=R-RA)
+wildcardwinners<-mutate(wildcardwinners,rundiff=R-RA)
+t.test(playoffteams$rundiff,bustedteams$rundiff,alternative = "greater")
+t.test(divisionwinners$rundiff,wildcardwinners$rundiff,alternative="two.sided")
+dotchart(modernteams$rundiff,cex=.7,groups= modernteams$playoffs,
+  	main="Run Differential of playoff teams",
+   xlab="Run Differential", gcolor="black", color=modernteams$color)
+```
+
+To win the game of baseball, teams must score runs than they give up. As a result, I decided to make a new variable called run differential which is used in baseball analytics. Through just a quick glance of the graph, Run Differential has a very similar cut off for playoffs vs not just like wins does. Through the use of a t.test, playoff teams run differential is very likely to be greater than teams that did not make the playoffs, and it is not evern close. Playoff teams generally have positive run differentials while those that don't make playoffs are negative. Within playoff teams, there does not seem to be a statistically significant difference between division winners and wild card winners. 
+
+
+A relatively good batting stat we have:
+Batting AVerage
+```{r}
+modernteams<-mutate(modernteams,BA=H/AB)
+playoffteams<-mutate(playoffteams,BA=H/AB)
+bustedteams<-mutate(bustedteams, BA=H/AB)
+divisionwinners<-mutate(divisionwinners,BA=H/AB)
+wildcardwinners<-mutate(wildcardwinners,BA=H/AB)
+summary(playoffteams$BA)
+summary(bustedteams$BA)
+t.test(playoffteams$BA,bustedteams$BA,alternative = "greater")
+t.test(divisionwinners$BA,wildcardwinners$BA,alternative="two.sided")
+dotchart(modernteams$BA,cex=.7,groups= modernteams$playoffs,
+  	main="Batting Average of playoff teams",
+   xlab="Batting Average", gcolor="black", color=modernteams$color)
+```
+
+When it comes to batting average, a t-test says that it is very likely that playoff teams have a higher batting average, but not a significant difference between division winners and wild card teams.However, a quick glance at the graph doesn't necessarily show a stark contrast between playoff and non-playoff teams. It is not as visually clear as it is like run differential and wins. 
+
+
+A pitching stat we have that is readily available:
+ERA
+```{r}
+t.test(playoffteams$ERA,bustedteams$ERA,alternative = "less")
+t.test(divisionwinners$ERA,wildcardwinners$ERA,alternative="two.sided")
+dotchart(modernteams$ERA,cex=.7,groups= modernteams$playoffs,
+  	main="Earned Run Average of playoff teams",
+   xlab="ERA", gcolor="black", color=modernteams$color)
+```
+
+When it comes to batting average, a t-test says that it is very likely that playoff teams have a lower batting average, but nearly no difference between division winners and wild card teams.However, a quick glance at the graph doesn't necessarily show a stark contrast between playoff and non-playoff teams. It is not as visually clear as it is like run differential and wins. 
+
+
+A measure of defense we have that is readily available:
+Errors
+```{r}
+t.test(playoffteams$E,bustedteams$E,alternative = "less")
+t.test(divisionwinners$E,wildcardwinners$E,alternative="two.sided")
+dotchart(modernteams$E,cex=.7,groups= modernteams$playoffs,
+  	main="Errors of playoff teams",
+   xlab="Errors", gcolor="black", color=modernteams$color)
+```
+
+When it comes to defense, the t-test says that playoff teams generally make less errors than teams that do not make playoffs. However there is no statistical difference between division and wild card winners when it comes to errors. 
+
+All the statistics we explored so far generally have a distinct pattern. Playoff teams have better stats when it comes to run differential, batting average,ERA, and errors but within playoff teams division leaders and wild card teams tend to look the same. Visually through the graphs, it isn't clear that the batting average, ERA, and errors differences are existent. The best measure we have to whether or not playoff teams are different to non-playoff teams are their win record and run differential, especially those two. It leades me to think it they are linearly correlated, which I will explore further now. 
+
+model between W and Rundiff
+```{r}
+win_rundiff_model<-lm(W~rundiff,data=modernteams)
+summary(win_rundiff_model)
+ci_win_rundiff_model <- confint(win_rundiff_model)
+summary(ci_win_rundiff_model)
+
+library(ggplot2)
+ggplot(modernteams, aes(x = rundiff, y = W)) + geom_point()+stat_smooth(method="lm")
+#starting to look like a linear model is a good fit
+```
+The regression equation now we have is wins=`r win_rundiff_model$coeffients[1]` + `r win_rundiff_model$coeffients[2]`*rundifferential.
+
+```{r}
+ggplot(win_rundiff_model, aes(x=rundiff))+geom_histogram(fill="green",colour="red")
+ggplot(win_rundiff_model, aes(x=W))+geom_histogram(fill="blue",colour="red")
+#both wins and rundiff seem relatively normally distributed
+layout(matrix(c(1,2,3,4),2,2))
+plot(win_rundiff_model)
+
+model.anova<-aov(W~rundiff,data=modernteams)
+summary(model.anova)
+```
+
+Check 1: Residuals look random and there is no particular pattern to them.  
+Check 2: QQ Plot looks good, vast majority of the points line on the line if not really close to it, with that said, data is said to be consistent with that from a normal distribution.   
+Check 3: Square root Standardized Residuals look good as well, we have a relatively flat line, suggesting we have constant variance.  
+Check 4: All points have low cook's distance. There are no particularly high residual points, a few high leverage points with low residuals. So those leverage points benefit our model.
+  
+With all this said, no need to transform data. 
+
+*Weighted Least Squares
+```{r}
+variances<-modernteams %>% group_by(rundiff) %>% summarise(var=var(W))
+lookup <- as.vector(variances[[2]])
+names(lookup) <- as.vector(variances[[1]])
+modernteams2 <- data.frame(modernteams$W,modernteams$rundiff, var = lookup[as.character(modernteams$rundiff)],stringsAsFactors = FALSE)
+names(modernteams2)<-c("W","rundiff","var")
+modernteams2<- modernteams2[complete.cases(modernteams2),]
+zero<-which(modernteams2$var==0)
+modernteams2<-slice(modernteams2,-zero)
+head(modernteams2)
+wt_win_rundiff_model<-lm(W~rundiff,weights=1/var,data=modernteams2)
+summary(wt_win_rundiff_model)
+wtr<-weighted.residuals(wt_win_rundiff_model)
+plot(modernteams2$rundiff,wtr)
+
+#transform the model
+modernteams2<-mutate(modernteams2,wts=1/var,ty=sqrt(wts)*W,tx1=sqrt(wts),tx2=sqrt(wts)*rundiff)
+modernteams2model<-lm(ty ~ tx1 + tx2 -1, data = modernteams2)
+summary(modernteams2model)
+layout(matrix(c(1,2,3,4),2,2))
+plot(modernteams2model)
+ggplot(modernteams2, aes(x = rundiff, y = W)) + geom_point()+stat_smooth(method="lm")
+```
+
+The weight residual model is supposedly a lot more fitting. From the naked eye on the graph, it does not look like much as changed, however, this model excludes over a third of the original values because variance couldn't exist for a lot of values. The regression equation now we have is wins=`r modernteams2model$coeffients[1]` + `r modernteams2model$coeffients[2]`*rundifferential.
+
+*Multiple Linear Regression
+```{r}
+multiplemodel<-lm(W~rundiff+BA+ERA+E,data=modernteams)
+summary(multiplemodel)
+coefficients(multiplemodel) # model coefficients
+confint(multiplemodel, level=0.95) # CIs for model parameters 
+anova(multiplemodel) # anova table 
+vcov(multiplemodel) # covariance matrix for model parameters 
+layout(matrix(c(1,2,3,4),2,2)) # optional 4 graphs/page 
+plot(multiplemodel)
+```
+
+**CONCLUSIONS**
+Although the original question as to determine what variables goes into assembling a playoff team, that is heavily dependent on if a team can achieve enough wins. Playoff teams generally have higher batting averages, lower ERA, make less Errors and have higher run differentials. Although evidently, wild card teams generally are not any different than division winners. With that said, wins and run differential seemed correlated and had similar dotplots. Upon further research, I discovered there is very likely a linear correlation between them. A linear model seemed to fit the best; it was not necessary to transform the data. The weighted least squares linear model seemed fit better but many of the values had to be removed because the variance discretion. A multiple linear regression seemed fitting as well.To enter playoffs, a team must have a good record, and to achieve this, it seems that Run Differential is the best predictor, which makes sense. You must score more than your opponents to win and so having a high run differential means you probably win a lot of games. 
